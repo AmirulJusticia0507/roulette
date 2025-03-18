@@ -21,15 +21,11 @@
       position: absolute; top: 190px; left: 190px; z-index: 99;
     }
     #arrow {
-        position: absolute;
-        top: -40px; 
-        left: 185px;
-        width: 0; 
-        height: 0;
+        position: absolute; top: -40px; left: 190px;
+        width: 0; height: 0;
         border-left: 15px solid transparent;
         border-right: 15px solid transparent;
         border-bottom: 40px solid yellow;
-        filter: drop-shadow(0 0 5px #000); /* Biar lebih kelihatan */
         z-index: 100;
       }
       
@@ -65,8 +61,13 @@
 
   <div class="mt-3">
     <button id="spin-btn" class="btn btn-danger">SPIN!</button>
+    <button id="reset-game-btn" class="btn btn-outline-danger">RESET GAME</button>
     <button id="select-all-btn" class="btn btn-warning">PILIH SEMUA</button>
     <button id="clear-all-btn" class="btn btn-secondary">CLEAR ALL</button>
+    <button id="auto-spin-btn" class="btn btn-primary">AUTO SPIN</button>
+    <button id="save-balance-btn" class="btn btn-success">SAVE BALANCE</button>
+    <button id="load-balance-btn" class="btn btn-info">LOAD BALANCE</button>
+    <button id="auto-bet-btn" class="btn btn-dark">AUTO BET RANDOM</button>
   </div>
 
   <h3 class="mt-4">Saldo: <span id="balance">$1,000,000,000</span></h3>
@@ -102,6 +103,7 @@
     let balance = 1000000000;
     let spinCount = 0;
     let bets = []; // Array of objects: {number: x, amount: y}
+    let autoSpinInterval = null;
     
     $(document).ready(function() {
       // Generate betting board
@@ -172,6 +174,108 @@
             $('#total-bet').text(`$${total.toLocaleString()}`);
         }
 
+        // CLEAR ALL Bets
+        $('#clear-bet-btn').click(function() {
+            bets = [];
+            $('.bet-cell').removeClass('active');
+            updateTotalBet();
+            $('#status').html('-');
+        });
+        
+        // AUTO SPIN Logic
+        $('#auto-spin-btn').click(function() {
+            if (autoSpinInterval) {
+            clearInterval(autoSpinInterval);
+            autoSpinInterval = null;
+            $(this).text('AUTO SPIN');
+            } else {
+            autoSpinInterval = setInterval(() => {
+                $('#spin-btn').trigger('click');
+            }, 7000); // Auto spin every 7 seconds
+            $(this).text('STOP AUTO');
+            }
+        });
+
+        // SAVE BALANCE to localStorage
+        $('#save-balance-btn').click(function() {
+            localStorage.setItem('roulette_balance', balance);
+            Swal.fire('Success', 'Balance berhasil disimpan!', 'success');
+        });
+        
+        // LOAD BALANCE from localStorage
+        $('#load-balance-btn').click(function() {
+            let saved = localStorage.getItem('roulette_balance');
+            if (saved) {
+            balance = parseInt(saved);
+            $('#balance').text(`$${balance.toLocaleString()}`);
+            Swal.fire('Success', 'Balance berhasil di-load!', 'success');
+            } else {
+            Swal.fire('Error', 'Tidak ada balance tersimpan!', 'error');
+            }
+        });
+
+        // RESET GAME BUTTON
+        $('#reset-game-btn').click(function() {
+            Swal.fire({
+                title: 'Yakin mau RESET GAME?',
+                text: "Semua data akan dikembalikan ke awal!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Reset!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    balance = 1000000000;
+                    bets = [];
+                    spinCount = 0;
+                    autoSpinInterval && clearInterval(autoSpinInterval);
+                    autoSpinInterval = null;
+
+                    $('#balance').text(`$${balance.toLocaleString()}`);
+                    $('#total-bet').text(`$0`);
+                    $('#result').text('-');
+                    $('#status').text('-');
+                    $('.bet-cell').removeClass('active');
+                    $('#log-body').empty();
+                    $('#auto-spin-btn').text('AUTO SPIN');
+
+                    Swal.fire('Reset Berhasil!', 'Game sudah kembali ke awal.', 'success');
+                }
+            });
+        });
+
+
+        // AUTO BET RANDOM
+        $('#auto-bet-btn').click(function() {
+                bets = []; // reset dulu
+                $('.bet-cell').removeClass('active');
+                
+                let randomBetCount = Math.floor(Math.random() * 6) + 5; // random 5-10 angka
+                let numbersArray = Array.from({ length: 37 }, (_, i) => i);
+                numbersArray = numbersArray.sort(() => 0.5 - Math.random()); // shuffle
+                
+                let selected = numbersArray.slice(0, randomBetCount);
+                
+                Swal.fire({
+                    title: 'Masukkan jumlah taruhan untuk Auto Bet Random:',
+                    input: 'number',
+                    inputPlaceholder: 'Masukkan jumlah...',
+                    showCancelButton: true,
+                    confirmButtonText: 'Pasang',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed && result.value > 0) {
+                        let amount = parseInt(result.value);
+                        selected.forEach(num => {
+                            bets.push({ number: num, amount: amount });
+                            $(`.bet-cell[data-bet="${num}"]`).addClass('active');
+                        });
+                        updateTotalBet();
+                        Swal.fire('Auto Bet Random!', `Taruhan random di angka: ${selected.join(', ')}`, 'info');
+                    }
+                });
+            });
+    
     
         $('#spin-btn').click(function() {
         if (bets.length === 0) {
